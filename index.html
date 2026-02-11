@@ -19,7 +19,7 @@
         <div id="location">📍 RISD Campus</div>
         <canvas id="gameCanvas"></canvas>
     </div>
-    <div class="instructions">Jump every 35 points to travel! ❤️ Dodge Cheese 🧀</div>
+    <div class="instructions">Tap twice for a Double Jump! ❤️ Dodge Cheese 🧀</div>
 
     <script>
         const canvas = document.getElementById("gameCanvas");
@@ -50,10 +50,13 @@
         let isGameOver = false;
         let gameFrame = 0;
 
-        const dino = { x: 50, y: 300, width: 60, height: 60, dy: 0, jumpForce: 14, gravity: 0.7, grounded: false };
+        const dino = { 
+            x: 50, y: 300, width: 60, height: 60, dy: 0, 
+            jumpForce: 13, gravity: 0.7, grounded: false,
+            jumps: 0, maxJumps: 2 
+        };
         const gameObjects = [];
 
-        // --- SCENERY SETTINGS (Rotating every 35 points) ---
         const scenes = [
             { name: "📍 RISD Campus", img: bgRISD, ground: "#7f8c8d", msg: "STUCK IN STUDIO! 🎨" },
             { name: "📍 Japan", img: bgJapan, ground: "#cf6a87", msg: "LOST IN SHIBUYA! 🌸" },
@@ -62,17 +65,21 @@
         ];
 
         function getCurrentScene() {
-            // Modulo logic: changes scene every 35 points
             const index = Math.floor(score / 35) % scenes.length;
             return scenes[index];
         }
 
         function handleAction() {
-            if (dino.grounded && !isGameOver) {
+            if (isGameOver) {
+                restart();
+                return;
+            }
+            // Double Jump Logic
+            if (dino.grounded || dino.jumps < dino.maxJumps) {
                 dino.dy = -dino.jumpForce;
+                dino.jumps++;
                 dino.grounded = false;
             }
-            if (isGameOver) restart();
         }
 
         window.addEventListener("keydown", (e) => { if(e.code === "Space") handleAction(); });
@@ -90,10 +97,12 @@
             if (isGameOver) return;
             dino.dy += dino.gravity;
             dino.y += dino.dy;
+
             if (dino.y + dino.height > canvas.height - 40) {
                 dino.y = canvas.height - 40 - dino.height;
                 dino.dy = 0;
                 dino.grounded = true;
+                dino.jumps = 0; // Reset jumps on landing
             }
 
             gameObjects.forEach((obj, index) => {
@@ -118,7 +127,7 @@
             });
 
             gameFrame++;
-            if (gameFrame % (Math.floor(Math.random() * 50) + 70) === 0) spawnGameObject();
+            if (gameFrame % (Math.floor(Math.random() * 50) + 75) === 0) spawnGameObject();
         }
 
         function draw() {
@@ -152,7 +161,7 @@
                 ctx.fillText(scene.msg, canvas.width/2, 160);
                 ctx.font = "20px sans-serif";
                 ctx.fillText("Score: " + score + " | Best: " + highScore, canvas.width/2, 210);
-                ctx.fillText("Tap to fly back to RISD", canvas.width/2, 260);
+                ctx.fillText("Tap to Restart Trip", canvas.width/2, 260);
             }
             update();
             requestAnimationFrame(draw);
@@ -160,7 +169,7 @@
 
         function restart() {
             score = 0; scoreElement.innerText = 0; gameObjects.length = 0;
-            gameSpeed = 5; isGameOver = false; dino.y = 200;
+            gameSpeed = 5; isGameOver = false; dino.y = 200; dino.jumps = 0;
         }
         draw();
     </script>

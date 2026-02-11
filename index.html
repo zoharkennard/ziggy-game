@@ -1,148 +1,168 @@
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-const scoreElement = document.getElementById("score");
-const locationTag = document.getElementById("location");
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ziggy's World Tour</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body { margin: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: #ffe6e6; font-family: sans-serif; overflow: hidden; touch-action: manipulation; }
+        #game-container { position: relative; width: 95vw; max-width: 600px; aspect-ratio: 3/2; }
+        canvas { border: 4px solid #ff4d4d; border-radius: 15px; width: 100%; height: 100%; box-shadow: 0 10px 30px rgba(255, 77, 77, 0.3); background-color: #fff; }
+        .ui { position: absolute; top: 15px; left: 20px; font-size: 24px; color: #ff4d4d; font-weight: bold; text-shadow: 1px 1px white; z-index: 10;}
+        #location { position: absolute; top: 15px; right: 20px; font-size: 16px; color: #ff4d4d; font-weight: bold; background: rgba(255,255,255,0.8); padding: 5px 12px; border-radius: 20px; z-index: 10; border: 2px solid #ff4d4d; }
+        .instructions { margin-top: 15px; color: #ff4d4d; font-size: 14px; text-align: center; font-weight: bold; }
+    </style>
+</head>
+<body>
 
-canvas.width = 600;
-canvas.height = 400;
+    <div id="game-container">
+        <div class="ui">Score: <span id="score">0</span></div>
+        <div id="location">📍 RISD Campus</div>
+        <canvas id="gameCanvas"></canvas>
+    </div>
+    <div class="instructions">Jump every 35 points to travel! ❤️ Dodge Cheese 🧀</div>
 
-// --- 1. CORE SPRITES ---
-const playerImg = new Image();
-playerImg.src = 'https://i.postimg.cc/c42vC0N1/ziggy_ziggygame_0001.png'; 
-const obstacleImg = new Image();
-obstacleImg.src = 'https://i.postimg.cc/25ZXqPS1/pixellab-a-slice-of-cheese-in-pixel-art-1770828928232.png';
-const collectibleImg = new Image();
-collectibleImg.src = 'https://i.postimg.cc/ZY6MHtZz/pixellab-a-pixel-art-heart-1770821820174.png'; 
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const scoreElement = document.getElementById("score");
+        const locationTag = document.getElementById("location");
 
-// --- 2. BACKGROUND SCENES ---
-const bgRISD = new Image(); bgRISD.src = 'https://i.postimg.cc/9XZc9QfF/IMG-5608.jpg';
-const bgJapan = new Image(); bgJapan.src = 'https://i.postimg.cc/gcXnTp2r/IMG-5608.jpg';
-const bgNYC = new Image(); bgNYC.src = 'https://i.postimg.cc/44qX7hGW/IMG-5608.jpg';
-const bgLA = new Image(); bgLA.src = 'https://i.postimg.cc/zGJD8Y8w/IMG-5608.jpg';
+        canvas.width = 600;
+        canvas.height = 400;
 
-let score = 0;
-let highScore = localStorage.getItem("ziggyHighScore") || 0;
-let gameSpeed = 5;
-let isGameOver = false;
-let gameFrame = 0;
+        // --- 1. CORE SPRITES ---
+        const playerImg = new Image();
+        playerImg.src = 'https://i.postimg.cc/c42vC0N1/ziggy_ziggygame_0001.png'; 
+        const obstacleImg = new Image();
+        obstacleImg.src = 'https://i.postimg.cc/25ZXqPS1/pixellab-a-slice-of-cheese-in-pixel-art-1770828928232.png';
+        const collectibleImg = new Image();
+        collectibleImg.src = 'https://i.postimg.cc/ZY6MHtZz/pixellab-a-pixel-art-heart-1770821820174.png'; 
 
-const dino = { x: 50, y: 300, width: 60, height: 60, dy: 0, jumpForce: 14, gravity: 0.7, grounded: false };
-const gameObjects = [];
+        // --- 2. BACKGROUND SCENES ---
+        const bgRISD = new Image(); bgRISD.src = 'https://i.postimg.cc/9XZc9QfF/IMG-5608.jpg';
+        const bgJapan = new Image(); bgJapan.src = 'https://i.postimg.cc/gcXnTp2r/IMG-5608.jpg';
+        const bgNYC = new Image(); bgNYC.src = 'https://i.postimg.cc/44qX7hGW/IMG-5608.jpg';
+        const bgLA = new Image(); bgLA.src = 'https://i.postimg.cc/zGJD8Y8w/IMG-5608.jpg';
 
-// --- SCENERY SETTINGS (New Order) ---
-const scenes = [
-    { name: "📍 RISD Campus", img: bgRISD, ground: "#7f8c8d", msg: "STUCK IN STUDIO! 🎨" },
-    { name: "📍 Japan", img: bgJapan, ground: "#cf6a87", msg: "LOST IN SHIBUYA! 🌸" },
-    { name: "📍 NYC Night", img: bgNYC, ground: "#16213e", msg: "SUBWAY DELAY! 🍎" },
-    { name: "📍 Los Angeles", img: bgLA, ground: "#e67e22", msg: "405 TRAFFIC JAM! 🌴" }
-];
+        let score = 0;
+        let highScore = localStorage.getItem("ziggyHighScore") || 0;
+        let gameSpeed = 5;
+        let isGameOver = false;
+        let gameFrame = 0;
 
-// NEW LOGIC: Rotates every 25 points
-function getCurrentScene() {
-    // Math.floor(score / 25) gets which "block" of 25 points we are in.
-    // % scenes.length makes it cycle 0, 1, 2, 3, then back to 0.
-    const index = Math.floor(score / 25) % scenes.length;
-    return scenes[index];
-}
+        const dino = { x: 50, y: 300, width: 60, height: 60, dy: 0, jumpForce: 14, gravity: 0.7, grounded: false };
+        const gameObjects = [];
 
-function handleAction() {
-    if (dino.grounded && !isGameOver) {
-        dino.dy = -dino.jumpForce;
-        dino.grounded = false;
-    }
-    if (isGameOver) restart();
-}
+        // --- SCENERY SETTINGS (Rotating every 35 points) ---
+        const scenes = [
+            { name: "📍 RISD Campus", img: bgRISD, ground: "#7f8c8d", msg: "STUCK IN STUDIO! 🎨" },
+            { name: "📍 Japan", img: bgJapan, ground: "#cf6a87", msg: "LOST IN SHIBUYA! 🌸" },
+            { name: "📍 NYC Night", img: bgNYC, ground: "#16213e", msg: "SUBWAY DELAY! 🍎" },
+            { name: "📍 Los Angeles", img: bgLA, ground: "#e67e22", msg: "405 TRAFFIC JAM! 🌴" }
+        ];
 
-window.addEventListener("keydown", (e) => { if(e.code === "Space") handleAction(); });
-canvas.addEventListener("touchstart", (e) => { e.preventDefault(); handleAction(); }, {passive: false});
+        function getCurrentScene() {
+            // Modulo logic: changes scene every 35 points
+            const index = Math.floor(score / 35) % scenes.length;
+            return scenes[index];
+        }
 
-function spawnGameObject() {
-    const size = 45;
-    const isObstacle = Math.random() > 0.4; 
-    let yPos = canvas.height - size - 40;
-    if (!isObstacle && Math.random() > 0.5) yPos -= 80;
-    gameObjects.push({ x: canvas.width, y: yPos, width: size, height: size, type: isObstacle ? 'obstacle' : 'collectible', counted: false });
-}
-
-function update() {
-    if (isGameOver) return;
-    dino.dy += dino.gravity;
-    dino.y += dino.dy;
-    if (dino.y + dino.height > canvas.height - 40) {
-        dino.y = canvas.height - 40 - dino.height;
-        dino.dy = 0;
-        dino.grounded = true;
-    }
-
-    gameObjects.forEach((obj, index) => {
-        obj.x -= gameSpeed;
-        if (dino.x < obj.x + obj.width - 15 && dino.x + dino.width - 15 > obj.x && dino.y < obj.y + obj.height - 15 && dino.y + dino.height - 15 > obj.y) {
-            if (obj.type === 'obstacle') {
-                isGameOver = true;
-                if (score > highScore) {
-                    highScore = score;
-                    localStorage.setItem("ziggyHighScore", highScore);
-                }
-            } else if (!obj.counted) {
-                score += 10; obj.counted = true; gameObjects.splice(index, 1);
-                scoreElement.innerText = score;
-                if(score % 50 === 0) gameSpeed += 0.5;
+        function handleAction() {
+            if (dino.grounded && !isGameOver) {
+                dino.dy = -dino.jumpForce;
+                dino.grounded = false;
             }
+            if (isGameOver) restart();
         }
-        if (obj.x + obj.width < 0) {
-            gameObjects.splice(index, 1);
-            if (obj.type === 'obstacle') { score++; scoreElement.innerText = score; }
+
+        window.addEventListener("keydown", (e) => { if(e.code === "Space") handleAction(); });
+        canvas.addEventListener("touchstart", (e) => { e.preventDefault(); handleAction(); }, {passive: false});
+
+        function spawnGameObject() {
+            const size = 45;
+            const isObstacle = Math.random() > 0.4; 
+            let yPos = canvas.height - size - 40;
+            if (!isObstacle && Math.random() > 0.5) yPos -= 80;
+            gameObjects.push({ x: canvas.width, y: yPos, width: size, height: size, type: isObstacle ? 'obstacle' : 'collectible', counted: false });
         }
-    });
 
-    gameFrame++;
-    if (gameFrame % (Math.floor(Math.random() * 50) + 70) === 0) spawnGameObject();
-}
+        function update() {
+            if (isGameOver) return;
+            dino.dy += dino.gravity;
+            dino.y += dino.dy;
+            if (dino.y + dino.height > canvas.height - 40) {
+                dino.y = canvas.height - 40 - dino.height;
+                dino.dy = 0;
+                dino.grounded = true;
+            }
 
-function draw() {
-    const scene = getCurrentScene();
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+            gameObjects.forEach((obj, index) => {
+                obj.x -= gameSpeed;
+                if (dino.x < obj.x + obj.width - 15 && dino.x + dino.width - 15 > obj.x && dino.y < obj.y + obj.height - 15 && dino.y + dino.height - 15 > obj.y) {
+                    if (obj.type === 'obstacle') {
+                        isGameOver = true;
+                        if (score > highScore) {
+                            highScore = score;
+                            localStorage.setItem("ziggyHighScore", highScore);
+                        }
+                    } else if (!obj.counted) {
+                        score += 10; obj.counted = true; gameObjects.splice(index, 1);
+                        scoreElement.innerText = score;
+                        if(score % 70 === 0) gameSpeed += 0.5;
+                    }
+                }
+                if (obj.x + obj.width < 0) {
+                    gameObjects.splice(index, 1);
+                    if (obj.type === 'obstacle') { score++; scoreElement.innerText = score; }
+                }
+            });
 
-    // 1. Draw Scene Image
-    if (scene.img.complete) {
-        ctx.drawImage(scene.img, 0, 0, canvas.width, 360); 
-    }
+            gameFrame++;
+            if (gameFrame % (Math.floor(Math.random() * 50) + 70) === 0) spawnGameObject();
+        }
 
-    // 2. Draw Ground
-    ctx.fillStyle = scene.ground;
-    ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
+        function draw() {
+            const scene = getCurrentScene();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 3. Draw Ziggy & Objects
-    ctx.drawImage(playerImg, dino.x, dino.y, dino.width, dino.height);
-    gameObjects.forEach(obj => {
-        ctx.drawImage(obj.type === 'obstacle' ? obstacleImg : collectibleImg, obj.x, obj.y, obj.width, obj.height);
-    });
+            if (scene.img.complete) {
+                ctx.drawImage(scene.img, 0, 0, canvas.width, 360); 
+            }
 
-    // 4. Update UI
-    locationTag.innerText = scene.name;
-    // Turn text white only if it's the NYC Night scene
-    ctx.fillStyle = (scene.name === "📍 NYC Night") ? "white" : "#ff4d4d";
-    ctx.font = "bold 18px sans-serif";
-    ctx.textAlign = "right";
-    ctx.fillText("Best: " + highScore, canvas.width - 20, 35);
+            ctx.fillStyle = scene.ground;
+            ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
 
-    if (isGameOver) {
-        ctx.fillStyle = "rgba(0,0,0,0.75)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "white";
-        ctx.textAlign = "center";
-        ctx.font = "bold 36px sans-serif";
-        ctx.fillText(scene.msg, canvas.width/2, 160);
-        ctx.font = "20px sans-serif";
-        ctx.fillText("Score: " + score + " | Best: " + highScore, canvas.width/2, 210);
-        ctx.fillText("Tap to fly back to RISD", canvas.width/2, 260);
-    }
-    update();
-    requestAnimationFrame(draw);
-}
+            ctx.drawImage(playerImg, dino.x, dino.y, dino.width, dino.height);
+            gameObjects.forEach(obj => {
+                ctx.drawImage(obj.type === 'obstacle' ? obstacleImg : collectibleImg, obj.x, obj.y, obj.width, obj.height);
+            });
 
-function restart() {
-    score = 0; scoreElement.innerText = 0; gameObjects.length = 0;
-    gameSpeed = 5; isGameOver = false; dino.y = 200;
-}
-draw();
+            locationTag.innerText = scene.name;
+            ctx.fillStyle = (scene.name === "📍 NYC Night") ? "white" : "#ff4d4d";
+            ctx.font = "bold 18px sans-serif";
+            ctx.textAlign = "right";
+            ctx.fillText("Best: " + highScore, canvas.width - 20, 35);
+
+            if (isGameOver) {
+                ctx.fillStyle = "rgba(0,0,0,0.75)";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "white";
+                ctx.textAlign = "center";
+                ctx.font = "bold 36px sans-serif";
+                ctx.fillText(scene.msg, canvas.width/2, 160);
+                ctx.font = "20px sans-serif";
+                ctx.fillText("Score: " + score + " | Best: " + highScore, canvas.width/2, 210);
+                ctx.fillText("Tap to fly back to RISD", canvas.width/2, 260);
+            }
+            update();
+            requestAnimationFrame(draw);
+        }
+
+        function restart() {
+            score = 0; scoreElement.innerText = 0; gameObjects.length = 0;
+            gameSpeed = 5; isGameOver = false; dino.y = 200;
+        }
+        draw();
+    </script>
+</body>
+</html>

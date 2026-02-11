@@ -41,6 +41,9 @@ const collectibleImg = new Image();
 collectibleImg.src = 'https://i.postimg.cc/ZY6MHtZz/pixellab-a-pixel-art-heart-1770821820174.png'; 
 
 let score = 0;
+// NEW FEATURE: Load High Score
+let highScore = localStorage.getItem("ziggyHighScore") || 0;
+
 let gameSpeed = 5;
 let isGameOver = false;
 let gameFrame = 0;
@@ -72,13 +75,11 @@ canvas.addEventListener("touchstart", (e) => { e.preventDefault(); handleAction(
 
 function spawnGameObject() {
     const size = 45;
-    // 60% chance of Cheese, 40% chance of Heart
     const isObstacle = Math.random() > 0.4; 
     
-    // Hearts sometimes spawn higher (jump to get them!)
     let yPos = canvas.height - size - 40;
     if (!isObstacle && Math.random() > 0.5) {
-        yPos -= 80; // Spawn in the air
+        yPos -= 80; 
     }
 
     gameObjects.push({
@@ -87,14 +88,13 @@ function spawnGameObject() {
         width: size,
         height: size,
         type: isObstacle ? 'obstacle' : 'collectible',
-        counted: false // To make sure we don't collect it twice
+        counted: false 
     });
 }
 
 function update() {
     if (isGameOver) return;
 
-    // Physics
     dino.dy += dino.gravity;
     dino.y += dino.dy;
 
@@ -107,39 +107,38 @@ function update() {
     gameObjects.forEach((obj, index) => {
         obj.x -= gameSpeed;
         
-        // COLLISION LOGIC
         if (dino.x < obj.x + obj.width - 15 && 
             dino.x + dino.width - 15 > obj.x &&
             dino.y < obj.y + obj.height - 15 && 
             dino.y + dino.height - 15 > obj.y) {
             
-            // If it's CHEESE...
             if (obj.type === 'obstacle') {
                 isGameOver = true;
+                // NEW FEATURE: Update High Score on Death
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem("ziggyHighScore", highScore);
+                }
             } 
-            // If it's a HEART...
             else if (obj.type === 'collectible' && !obj.counted) {
-                score += 10; // Bonus points!
+                score += 10; 
                 obj.counted = true; 
-                gameObjects.splice(index, 1); // Remove the heart
+                gameObjects.splice(index, 1); 
                 scoreElement.innerText = score;
-                // Make speed slightly faster every 50 points
                 if(score % 50 === 0) gameSpeed += 0.5;
             }
         }
 
-        // Cleanup objects that go off screen
         if (obj.x + obj.width < 0) {
             gameObjects.splice(index, 1);
             if (obj.type === 'obstacle') {
-                score++; // You get 1 point for surviving cheese
+                score++; 
                 scoreElement.innerText = score;
             }
         }
     });
 
     gameFrame++;
-    // Spawn something randomly between 70-120 frames
     if (gameFrame % (Math.floor(Math.random() * 50) + 70) === 0) {
          spawnGameObject();
     }
@@ -171,16 +170,25 @@ function draw() {
         }
     });
 
+    // NEW FEATURE: Display Best Score in the corner
+    ctx.fillStyle = "#ff4d4d";
+    ctx.font = "bold 18px sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("Best: " + highScore, canvas.width - 20, 35);
+
     if (isGameOver) {
         ctx.fillStyle = "rgba(255, 77, 77, 0.9)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = "white";
         ctx.textAlign = "center";
         ctx.font = "bold 40px sans-serif";
-        ctx.fillText("CHEESE ATTACK!", canvas.width/2, 160);
-        ctx.font = "20px sans-serif";
+        ctx.fillText("CHEESE ATTACK!", canvas.width/2, 150);
+        ctx.font = "24px sans-serif";
         ctx.fillText("Final Score: " + score, canvas.width/2, 200);
-        ctx.fillText("Tap to Try Again", canvas.width/2, 240);
+        // NEW FEATURE: Display High Score on Game Over
+        ctx.fillText("Personal Best: " + highScore, canvas.width/2, 240);
+        ctx.font = "18px sans-serif";
+        ctx.fillText("Tap to Try Again", canvas.width/2, 290);
     }
 
     update();

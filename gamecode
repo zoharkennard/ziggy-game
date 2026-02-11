@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ziggy's Valentine Run</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body { margin: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: #ffe6e6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; touch-action: manipulation; }
+        #game-container { position: relative; width: 95vw; max-width: 600px; aspect-ratio: 3/2; }
+        canvas { background: #fffafa; border: 4px solid #ff4d4d; border-radius: 15px; width: 100%; height: 100%; box-shadow: 0 10px 30px rgba(255, 77, 77, 0.3); }
+        .ui { position: absolute; top: 15px; left: 20px; font-size: 24px; color: #ff4d4d; font-weight: bold; text-shadow: 1px 1px white; z-index: 10;}
+        .instructions { margin-top: 15px; color: #ff4d4d; font-size: 14px; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div class="ui">Score: <span id="score">0</span></div>
+        <canvas id="gameCanvas"></canvas>
+    </div>
+    <div class="instructions">Tap or Press Space to Jump! <br> Catch Hearts ❤️ (+10) | Dodge the Cheese 🧀</div>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+const scoreElement = document.getElementById("score");
+
+// Mobile-friendly resizing
+canvas.width = 600;
+canvas.height = 400;
+
+// --- 1. PLAYER IMAGE (Ziggy) ---
+const playerImg = new Image();
+playerImg.src = 'https://i.postimg.cc/c42vC0N1/ziggy_ziggygame_0001.png'; 
+
+// --- 2. OBSTACLE IMAGE (The Cheese) ---
+const obstacleImg = new Image();
+obstacleImg.src = 'https://i.postimg.cc/KvydhcQv/pixellab-a-pixel-art-slice-of-cheese-1770821775877.png';
+
+// --- 3. COLLECTIBLE IMAGE (The Heart) ---
+const collectibleImg = new Image();
+collectibleImg.src = 'https://i.postimg.cc/ZY6MHtZz/pixellab-a-pixel-art-heart-1770821820174.png'; 
+
+let score = 0;
+let gameSpeed = 5;
+let isGameOver = false;
+let gameFrame = 0;
+
+// Player settings
+const dino = {
+    x: 50,
+    y: 300,
+    width: 60, 
+    height: 60,
+    dy: 0,
+    jumpForce: 14,
+    gravity: 0.7,
+    grounded: false
+};
+
+const gameObjects = [];
+
+function handleAction() {
+    if (dino.grounded && !isGameOver) {
+        dino.dy = -dino.jumpForce;
+        dino.grounded = false;
+    }
+    if (isGameOver) restart();
+}
+
+window.addEventListener("keydown", (e) => { if(e.code === "Space") handleAction(); });
+canvas.addEventListener("touchstart", (e) => { e.preventDefault(); handleAction(); }, {passive: false});
+
+function spawnGameObject() {
+    const size = 45;
+    // 60% chance of Cheese, 40% chance of Heart
+    const isObstacle = Math.random() > 0.4; 
+    
+    // Hearts sometimes spawn higher (jump to get them!)
+    let yPos = canvas.height - size - 40;
+    if (!isObstacle && Math.random() > 0.5) {
+        yPos -= 80; // Spawn in the air
+    }
+
+    gameObjects.push({
+        x: canvas.width,
+        y: yPos,
+        width: size,
+        height: size,
+        type: isObstacle ? 'obstacle' : 'collectible',
+        counted: false // To make sure we don't collect it twice
+    });
+}
+
+function update() {
+    if (isGameOver) return;
+
+    // Physics
+    dino.dy += dino.gravity;
+    dino.y += dino.dy;
+
+    if (dino.y + dino.height > canvas.height - 40) {
+        dino.y = canvas.height - 40 - dino.height;
+        dino.dy = 0;
+        dino.grounded = true;
+    }
+
+    gameObjects.forEach((obj, index) => {
+        obj.x -= gameSpeed;
+        
+        // COLLISION LOGIC
+        if (dino.x < obj.x + obj.width - 15 && 
+            dino.x + dino.width - 15 > obj.x &&
+            dino.y < obj.y + obj.height - 15 && 
+            dino.y + dino.height - 15 > obj.y) {
+            
+            // If it's CHEESE...
+            if (obj.type === 'obstacle') {
+                isGameOver = true;
+            } 
+            // If it's a HEART...
+            else if (obj.type === 'collectible' && !obj.counted) {
+                score += 10; // Bonus points!
+                obj.counted = true; 
+                gameObjects.splice(index, 1); // Remove the heart
+                scoreElement.innerText = score;
+                // Make speed slightly faster every 50 points
+                if(score % 50 === 0) gameSpeed += 0.5;
+            }
+        }
+
+        // Cleanup objects that go off screen
+        if (obj.x + obj.width < 0) {
+            gameObjects.splice(index, 1);
+            if (obj.type === 'obstacle') {
+                score++; // You get 1 point for surviving cheese
+                scoreElement.innerText = score;
+            }
+        }
+    });
+
+    gameFrame++;
+    // Spawn something randomly between 70-120 frames
+    if (gameFrame % (Math.floor(Math.random() * 50) + 70) === 0) {
+         spawnGameObject();
+    }
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Ground
+    ctx.fillStyle = "#ffb3b3";
+    ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
+
+    // Draw Ziggy
+    if (playerImg.complete) {
+        ctx.drawImage(playerImg, dino.x, dino.y, dino.width, dino.height);
+    } else {
+        ctx.font = "50px Arial";
+        ctx.fillText("🏃", dino.x, dino.y + 45);
+    }
+
+    // Draw Objects
+    gameObjects.forEach(obj => {
+        if (obj.type === 'obstacle') {
+            if (obstacleImg.complete) ctx.drawImage(obstacleImg, obj.x, obj.y, obj.width, obj.height);
+            else { ctx.font = "30px Arial"; ctx.fillText("🧀", obj.x, obj.y + 35); }
+        } else {
+            if (collectibleImg.complete) ctx.drawImage(collectibleImg, obj.x, obj.y, obj.width, obj.height);
+            else { ctx.font = "30px Arial"; ctx.fillText("❤️", obj.x, obj.y + 35); }
+        }
+    });
+
+    if (isGameOver) {
+        ctx.fillStyle = "rgba(255, 77, 77, 0.9)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "white";
+        ctx.textAlign = "center";
+        ctx.font = "bold 40px sans-serif";
+        ctx.fillText("CHEESE ATTACK!", canvas.width/2, 160);
+        ctx.font = "20px sans-serif";
+        ctx.fillText("Final Score: " + score, canvas.width/2, 200);
+        ctx.fillText("Tap to Try Again", canvas.width/2, 240);
+    }
+
+    update();
+    requestAnimationFrame(draw);
+}
+
+function restart() {
+    score = 0;
+    scoreElement.innerText = 0;
+    gameObjects.length = 0;
+    gameSpeed = 5;
+    isGameOver = false;
+    dino.y = 200;
+}
+
+draw();
+</script>
+</body>
+</html>

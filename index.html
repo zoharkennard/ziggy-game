@@ -37,11 +37,11 @@ const scenes = [
     { name: "📍 Los Angeles", img: bgLA, ground: "#e67e22", msg: "405 TRAFFIC JAM! 🌴" }
 ];
 
-// NEW LOGIC: Rotates every 50 points
+// NEW LOGIC: Rotates every 25 points
 function getCurrentScene() {
-    // Math.floor(score / 50) gets which "block" of 50 points we are in.
+    // Math.floor(score / 25) gets which "block" of 25 points we are in.
     // % scenes.length makes it cycle 0, 1, 2, 3, then back to 0.
-    const index = Math.floor(score / 50) % scenes.length;
+    const index = Math.floor(score / 25) % scenes.length;
     return scenes[index];
 }
 

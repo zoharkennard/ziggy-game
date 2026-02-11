@@ -9,7 +9,7 @@
         canvas { border: 4px solid #ff4d4d; border-radius: 15px; width: 100%; height: 100%; box-shadow: 0 10px 30px rgba(255, 77, 77, 0.3); background-color: #fff; }
         .ui { position: absolute; top: 15px; left: 20px; font-size: 24px; color: #ff4d4d; font-weight: bold; text-shadow: 1px 1px white; z-index: 10;}
         #location { position: absolute; top: 15px; right: 20px; font-size: 16px; color: #ff4d4d; font-weight: bold; background: rgba(255,255,255,0.8); padding: 5px 12px; border-radius: 20px; z-index: 10; border: 2px solid #ff4d4d; }
-        #cheer-bubble { position: absolute; bottom: 80px; left: 80px; background: white; border: 2px solid #ff4d4d; padding: 5px 10px; border-radius: 10px; font-weight: bold; color: #ff4d4d; display: none; z-index: 20; font-size: 14px; }
+        .instructions { margin-top: 15px; color: #ff4d4d; font-size: 14px; text-align: center; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -17,45 +17,42 @@
     <div id="game-container">
         <div class="ui">Score: <span id="score">0</span></div>
         <div id="location">📍 RISD Campus</div>
-        <div id="cheer-bubble">GO GO GO! ❤️</div>
         <canvas id="gameCanvas"></canvas>
     </div>
+    <div class="instructions">Double Tap to Jump! ❤️ </div>
 
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
         const scoreElement = document.getElementById("score");
         const locationTag = document.getElementById("location");
-        const cheerBubble = document.getElementById("cheer-bubble");
 
         canvas.width = 600;
         canvas.height = 400;
 
-        // --- 1. IMAGES ---
+        // --- IMAGES ---
         const playerImg = new Image(); playerImg.src = 'https://i.postimg.cc/c42vC0N1/ziggy_ziggygame_0001.png'; 
         const obstacleImg = new Image(); obstacleImg.src = 'https://i.postimg.cc/25ZXqPS1/pixellab-a-slice-of-cheese-in-pixel-art-1770828928232.png';
         const collectibleImg = new Image(); collectibleImg.src = 'https://i.postimg.cc/ZY6MHtZz/pixellab-a-pixel-art-heart-1770821820174.png'; 
-        
-        // YOUR PIXEL CHARACTER
-        const cheerImg = new Image(); 
-        cheerImg.src = 'PASTE_YOUR_PIXEL_SELF_LINK_HERE'; // <--- ADD YOUR LINK HERE
 
         const bgRISD = new Image(); bgRISD.src = 'https://i.postimg.cc/9XZc9QfF/IMG-5608.jpg';
         const bgJapan = new Image(); bgJapan.src = 'https://i.postimg.cc/gcXnTp2r/IMG-5608.jpg';
         const bgNYC = new Image(); bgNYC.src = 'https://i.postimg.cc/44qX7hGW/IMG-5608.jpg';
         const bgLA = new Image(); bgLA.src = 'https://i.postimg.cc/zGJD8Y8w/IMG-5608.jpg';
 
-        // --- 2. STATE ---
+        // --- STATE ---
         let score = 0;
         let highScore = localStorage.getItem("ziggyHighScore") || 0;
         let gameSpeed = 5;
         let spawnRate = 90;
         let isGameOver = false;
         let gameFrame = 0;
-        let lastCheerScore = -1;
-        let showCheer = false;
 
-        const dino = { x: 50, y: 300, width: 60, height: 60, dy: 0, jumpForce: 13, gravity: 0.7, grounded: false, jumps: 0, maxJumps: 2 };
+        const dino = { 
+            x: 50, y: 300, width: 60, height: 60, dy: 0, 
+            jumpForce: 13, gravity: 0.7, grounded: false,
+            jumps: 0, maxJumps: 2 
+        };
         let gameObjects = [];
 
         const scenes = [
@@ -64,8 +61,6 @@
             { name: "📍 NYC Night", img: bgNYC, ground: "#16213e", msg: "SUBWAY DELAY! 🍎" },
             { name: "📍 Los Angeles", img: bgLA, ground: "#e67e22", msg: "405 TRAFFIC JAM! 🌴" }
         ];
-
-        const cheerMessages = ["YOU GOT THIS! ❤️", "GO BABY GO! ✨", "RISD PROUD! 🎨", "KEEP JUMPING! 🐾"];
 
         function getCurrentScene() {
             const index = Math.floor(score / 35) % scenes.length;
@@ -94,8 +89,10 @@
 
         function update() {
             if (isGameOver) return;
+            
             dino.dy += dino.gravity;
             dino.y += dino.dy;
+
             if (dino.y + dino.height > canvas.height - 40) {
                 dino.y = canvas.height - 40 - dino.height;
                 dino.dy = 0;
@@ -103,27 +100,27 @@
                 dino.jumps = 0;
             }
 
-            // --- CHEER LOGIC ---
-            let currentSceneIndex = Math.floor(score / 35);
-            if (currentSceneIndex > lastCheerScore && score > 0) {
-                triggerCheer();
-                lastCheerScore = currentSceneIndex;
-                if (gameSpeed < 10) gameSpeed += 0.2;
-                if (spawnRate > 50) spawnRate -= 2;
+            // Speed & Spawn Scaling
+            if (score > 0 && score % 35 === 0) {
+                if (gameSpeed < 10) gameSpeed += 0.005;
+                if (spawnRate > 50) spawnRate -= 0.01;
             }
 
             for (let i = gameObjects.length - 1; i >= 0; i--) {
                 let obj = gameObjects[i];
                 obj.x -= gameSpeed;
+
                 if (dino.x < obj.x + obj.width - 15 && dino.x + dino.width - 15 > obj.x && dino.y < obj.y + obj.height - 15 && dino.y + dino.height - 15 > obj.y) {
                     if (obj.type === 'obstacle') {
                         isGameOver = true;
                         if (score > highScore) { highScore = score; localStorage.setItem("ziggyHighScore", highScore); }
                     } else if (!obj.counted) {
-                        score += 10; obj.counted = true; gameObjects.splice(i, 1);
+                        score += 10; obj.counted = true;
+                        gameObjects.splice(i, 1);
                         scoreElement.innerText = score;
                     }
                 }
+
                 if (obj.x + obj.width < -20) {
                     gameObjects.splice(i, 1);
                     if (obj.type === 'obstacle') { score++; scoreElement.innerText = score; }
@@ -134,28 +131,16 @@
             if (gameFrame % Math.floor(spawnRate) === 0) spawnGameObject();
         }
 
-        function triggerCheer() {
-            showCheer = true;
-            cheerBubble.innerText = cheerMessages[Math.floor(Math.random() * cheerMessages.length)];
-            cheerBubble.style.display = "block";
-            setTimeout(() => { 
-                showCheer = false; 
-                cheerBubble.style.display = "none";
-            }, 3000);
-        }
-
         function draw() {
             const scene = getCurrentScene();
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            if (scene.img.complete) ctx.drawImage(scene.img, 0, 0, canvas.width, 360); 
+            if (scene.img.complete) {
+                ctx.drawImage(scene.img, 0, 0, canvas.width, 360); 
+            }
+
             ctx.fillStyle = scene.ground;
             ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
-
-            // Draw Cheer Character
-            if (showCheer && cheerImg.complete) {
-                ctx.drawImage(cheerImg, 20, canvas.height - 110, 60, 80);
-            }
 
             ctx.drawImage(playerImg, dino.x, dino.y, dino.width, dino.height);
             gameObjects.forEach(obj => {
@@ -179,6 +164,7 @@
                 ctx.fillText("Score: " + score, canvas.width/2, 210);
                 ctx.fillText("Tap to Restart", canvas.width/2, 260);
             }
+
             update();
             requestAnimationFrame(draw);
         }
@@ -186,8 +172,9 @@
         function restart() {
             score = 0; scoreElement.innerText = 0; gameObjects = [];
             gameSpeed = 5; spawnRate = 90; isGameOver = false; 
-            dino.y = 200; dino.dy = 0; dino.jumps = 0; lastCheerScore = -1;
+            dino.y = 200; dino.dy = 0; dino.jumps = 0;
         }
+
         draw();
     </script>
 </body>

@@ -19,7 +19,7 @@
         <div id="location">📍 RISD Campus</div>
         <canvas id="gameCanvas"></canvas>
     </div>
-    <div class="instructions">Tap twice for a Double Jump! ❤️ Dodge Cheese 🧀</div>
+    <div class="instructions">Double Tap to Jump! ❤️ Dodge Cheese 🧀</div>
 
     <script>
         const canvas = document.getElementById("gameCanvas");
@@ -30,32 +30,30 @@
         canvas.width = 600;
         canvas.height = 400;
 
-        // --- 1. CORE SPRITES ---
-        const playerImg = new Image();
-        playerImg.src = 'https://i.postimg.cc/c42vC0N1/ziggy_ziggygame_0001.png'; 
-        const obstacleImg = new Image();
-        obstacleImg.src = 'https://i.postimg.cc/25ZXqPS1/pixellab-a-slice-of-cheese-in-pixel-art-1770828928232.png';
-        const collectibleImg = new Image();
-        collectibleImg.src = 'https://i.postimg.cc/ZY6MHtZz/pixellab-a-pixel-art-heart-1770821820174.png'; 
+        // --- IMAGES ---
+        const playerImg = new Image(); playerImg.src = 'https://i.postimg.cc/c42vC0N1/ziggy_ziggygame_0001.png'; 
+        const obstacleImg = new Image(); obstacleImg.src = 'https://i.postimg.cc/25ZXqPS1/pixellab-a-slice-of-cheese-in-pixel-art-1770828928232.png';
+        const collectibleImg = new Image(); collectibleImg.src = 'https://i.postimg.cc/ZY6MHtZz/pixellab-a-pixel-art-heart-1770821820174.png'; 
 
-        // --- 2. BACKGROUND SCENES ---
         const bgRISD = new Image(); bgRISD.src = 'https://i.postimg.cc/9XZc9QfF/IMG-5608.jpg';
         const bgJapan = new Image(); bgJapan.src = 'https://i.postimg.cc/gcXnTp2r/IMG-5608.jpg';
         const bgNYC = new Image(); bgNYC.src = 'https://i.postimg.cc/44qX7hGW/IMG-5608.jpg';
         const bgLA = new Image(); bgLA.src = 'https://i.postimg.cc/zGJD8Y8w/IMG-5608.jpg';
 
+        // --- STATE ---
         let score = 0;
         let highScore = localStorage.getItem("ziggyHighScore") || 0;
         let gameSpeed = 5;
         let isGameOver = false;
         let gameFrame = 0;
+        let animationId;
 
         const dino = { 
             x: 50, y: 300, width: 60, height: 60, dy: 0, 
             jumpForce: 13, gravity: 0.7, grounded: false,
             jumps: 0, maxJumps: 2 
         };
-        const gameObjects = [];
+        let gameObjects = [];
 
         const scenes = [
             { name: "📍 RISD Campus", img: bgRISD, ground: "#7f8c8d", msg: "STUCK IN STUDIO! 🎨" },
@@ -74,7 +72,6 @@
                 restart();
                 return;
             }
-            // Double Jump Logic
             if (dino.grounded || dino.jumps < dino.maxJumps) {
                 dino.dy = -dino.jumpForce;
                 dino.jumps++;
@@ -95,6 +92,7 @@
 
         function update() {
             if (isGameOver) return;
+            
             dino.dy += dino.gravity;
             dino.y += dino.dy;
 
@@ -102,11 +100,13 @@
                 dino.y = canvas.height - 40 - dino.height;
                 dino.dy = 0;
                 dino.grounded = true;
-                dino.jumps = 0; // Reset jumps on landing
+                dino.jumps = 0;
             }
 
-            gameObjects.forEach((obj, index) => {
+            for (let i = gameObjects.length - 1; i >= 0; i--) {
+                let obj = gameObjects[i];
                 obj.x -= gameSpeed;
+
                 if (dino.x < obj.x + obj.width - 15 && dino.x + dino.width - 15 > obj.x && dino.y < obj.y + obj.height - 15 && dino.y + dino.height - 15 > obj.y) {
                     if (obj.type === 'obstacle') {
                         isGameOver = true;
@@ -115,19 +115,23 @@
                             localStorage.setItem("ziggyHighScore", highScore);
                         }
                     } else if (!obj.counted) {
-                        score += 10; obj.counted = true; gameObjects.splice(index, 1);
+                        score += 10; obj.counted = true;
+                        gameObjects.splice(i, 1);
                         scoreElement.innerText = score;
-                        if(score % 70 === 0) gameSpeed += 0.5;
                     }
                 }
+
                 if (obj.x + obj.width < 0) {
-                    gameObjects.splice(index, 1);
+                    gameObjects.splice(i, 1);
                     if (obj.type === 'obstacle') { score++; scoreElement.innerText = score; }
                 }
-            });
+            }
 
             gameFrame++;
-            if (gameFrame % (Math.floor(Math.random() * 50) + 75) === 0) spawnGameObject();
+            if (gameFrame % 80 === 0) spawnGameObject();
+            
+            // Gradually increase speed but cap it so it stays playable
+            if (score > 0 && score % 100 === 0 && gameSpeed < 10) gameSpeed += 0.01;
         }
 
         function draw() {
@@ -160,17 +164,26 @@
                 ctx.font = "bold 36px sans-serif";
                 ctx.fillText(scene.msg, canvas.width/2, 160);
                 ctx.font = "20px sans-serif";
-                ctx.fillText("Score: " + score + " | Best: " + highScore, canvas.width/2, 210);
-                ctx.fillText("Tap to Restart Trip", canvas.width/2, 260);
+                ctx.fillText("Score: " + score, canvas.width/2, 210);
+                ctx.fillText("Tap to Restart", canvas.width/2, 260);
             }
+
             update();
-            requestAnimationFrame(draw);
+            animationId = requestAnimationFrame(draw);
         }
 
         function restart() {
-            score = 0; scoreElement.innerText = 0; gameObjects.length = 0;
-            gameSpeed = 5; isGameOver = false; dino.y = 200; dino.jumps = 0;
+            score = 0; 
+            scoreElement.innerText = 0; 
+            gameObjects = [];
+            gameSpeed = 5; 
+            isGameOver = false; 
+            dino.y = 200; 
+            dino.dy = 0;
+            dino.jumps = 0;
         }
+
+        // Start game
         draw();
     </script>
 </body>

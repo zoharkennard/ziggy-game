@@ -1,64 +1,182 @@
-// --- UPDATE THESE VARIABLES IN YOUR STATE SECTION ---
-let baseSpeed = 5.5; // Slightly faster start
-let gravityBase = 0.7;
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ziggy's World Tour: HARD MODE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body { margin: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: #ffe6e6; font-family: sans-serif; overflow: hidden; touch-action: manipulation; }
+        #game-container { position: relative; width: 95vw; max-width: 600px; aspect-ratio: 3/2; }
+        canvas { border: 4px solid #ff4d4d; border-radius: 15px; width: 100%; height: 100%; box-shadow: 0 10px 30px rgba(255, 77, 77, 0.3); background-color: #fff; }
+        .ui { position: absolute; top: 15px; left: 20px; font-size: 24px; color: #ff4d4d; font-weight: bold; text-shadow: 1px 1px white; z-index: 10;}
+        #location { position: absolute; top: 15px; right: 20px; font-size: 16px; color: #ff4d4d; font-weight: bold; background: rgba(255,255,255,0.8); padding: 5px 12px; border-radius: 20px; z-index: 10; border: 2px solid #ff4d4d; }
+        .instructions { margin-top: 15px; color: #ff4d4d; font-size: 14px; text-align: center; font-weight: bold; }
+    </style>
+</head>
+<body>
 
-function update() {
-    if (isGameOver) return;
-    
-    // CALCULATE DIFFICULTY LEVEL
-    let difficulty = Math.floor(score / 35); 
-    
-    // 1. INCREASE GRAVITY (Makes jumps feel "heavier" and faster)
-    let currentGravity = gravityBase + (difficulty * 0.08);
-    dino.dy += currentGravity;
-    dino.y += dino.dy;
+    <div id="game-container">
+        <div class="ui">Score: <span id="score">0</span></div>
+        <div id="location">📍 RISD Campus</div>
+        <canvas id="gameCanvas"></canvas>
+    </div>
+    <div class="instructions">WARNING: HARD MODE! Double Tap to Jump | Faster every 35 pts</div>
 
-    if (dino.y + dino.height > canvas.height - 40) {
-        dino.y = canvas.height - 40 - dino.height;
-        dino.dy = 0;
-        dino.grounded = true;
-        dino.jumps = 0;
-    }
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const scoreElement = document.getElementById("score");
+        const locationTag = document.getElementById("location");
 
-    // 2. AGGRESSIVE SPEED (Noticeable jump every 35 points)
-    let currentSpeed = baseSpeed + (difficulty * 1.2); 
-    
-    // 3. TIGHTER SPAWN GAPS (The cheese will come in quick waves)
-    let currentSpawnGap = Math.max(35, 80 - (difficulty * 12));
+        canvas.width = 600;
+        canvas.height = 400;
 
-    for (let i = gameObjects.length - 1; i >= 0; i--) {
-        let obj = gameObjects[i];
-        obj.x -= currentSpeed;
+        // --- ASSETS ---
+        const playerImg = new Image(); playerImg.src = 'https://i.postimg.cc/c42vC0N1/ziggy_ziggygame_0001.png'; 
+        const obstacleImg = new Image(); obstacleImg.src = 'https://i.postimg.cc/25ZXqPS1/pixellab-a-slice-of-cheese-in-pixel-art-1770828928232.png';
+        const collectibleImg = new Image(); collectibleImg.src = 'https://i.postimg.cc/ZY6MHtZz/pixellab-a-pixel-art-heart-1770821820174.png'; 
 
-        // Collision logic
-        if (dino.x < obj.x + obj.width - 15 && dino.x + dino.width - 15 > obj.x && dino.y < obj.y + obj.height - 15 && dino.y + dino.height - 15 > obj.y) {
-            if (obj.type === 'obstacle') {
-                isGameOver = true;
-                if (score > highScore) { highScore = score; localStorage.setItem("ziggyHighScore", highScore); }
-            } else if (!obj.counted) {
-                score += 10; obj.counted = true;
-                gameObjects.splice(i, 1);
-                scoreElement.innerText = score;
+        const bgRISD = new Image(); bgRISD.src = 'https://i.postimg.cc/9XZc9QfF/IMG-5608.jpg';
+        const bgJapan = new Image(); bgJapan.src = 'https://i.postimg.cc/gcXnTp2r/IMG-5608.jpg';
+        const bgNYC = new Image(); bgNYC.src = 'https://i.postimg.cc/44qX7hGW/IMG-5608.jpg';
+        const bgLA = new Image(); bgLA.src = 'https://i.postimg.cc/zGJD8Y8w/IMG-5608.jpg';
+
+        // --- GAME SETTINGS ---
+        let score = 0;
+        let highScore = localStorage.getItem("ziggyHighScore") || 0;
+        let isGameOver = false;
+        let gameFrame = 0;
+        let gameObjects = [];
+
+        const dino = { 
+            x: 50, y: 300, width: 60, height: 60, dy: 0, 
+            jumpForce: 13, gravityBase: 0.7, grounded: false,
+            jumps: 0, maxJumps: 2 
+        };
+
+        const scenes = [
+            { name: "📍 RISD Campus", img: bgRISD, ground: "#7f8c8d", msg: "STUCK IN STUDIO! 🎨" },
+            { name: "📍 Japan", img: bgJapan, ground: "#cf6a87", msg: "LOST IN SHIBUYA! 🌸" },
+            { name: "📍 NYC Night", img: bgNYC, ground: "#16213e", msg: "SUBWAY DELAY! 🍎" },
+            { name: "📍 Los Angeles", img: bgLA, ground: "#e67e22", msg: "405 TRAFFIC JAM! 🌴" }
+        ];
+
+        function getCurrentScene() {
+            const index = Math.floor(score / 35) % scenes.length;
+            return scenes[index];
+        }
+
+        function spawnGameObject() {
+            const size = 42;
+            const isObstacle = Math.random() > 0.35; 
+            let yPos = canvas.height - size - 40;
+            if (!isObstacle) yPos -= 90;
+            gameObjects.push({ x: canvas.width, y: yPos, width: size, height: size, type: isObstacle ? 'obstacle' : 'collectible', counted: false });
+        }
+
+        function handleAction() {
+            if (isGameOver) { restart(); return; }
+            if (dino.grounded || dino.jumps < dino.maxJumps) {
+                dino.dy = -dino.jumpForce;
+                dino.jumps++;
+                dino.grounded = false;
             }
         }
 
-        if (obj.x + obj.width < -20) {
-            gameObjects.splice(i, 1);
-            if (obj.type === 'obstacle') { score++; scoreElement.innerText = score; }
+        window.addEventListener("keydown", (e) => { if(e.code === "Space" || e.code === "ArrowUp") handleAction(); });
+        canvas.addEventListener("touchstart", (e) => { e.preventDefault(); handleAction(); }, {passive: false});
+
+        function update() {
+            if (isGameOver) return;
+            
+            let difficulty = Math.floor(score / 35);
+            
+            // Hard Mode Physics
+            let currentGravity = dino.gravityBase + (difficulty * 0.08);
+            dino.dy += currentGravity;
+            dino.y += dino.dy;
+
+            if (dino.y + dino.height > canvas.height - 40) {
+                dino.y = canvas.height - 40 - dino.height;
+                dino.dy = 0;
+                dino.grounded = true;
+                dino.jumps = 0;
+            }
+
+            // Hard Mode Speed and Spawning
+            let currentSpeed = 5.5 + (difficulty * 1.2);
+            let currentSpawnGap = Math.max(35, 80 - (difficulty * 12));
+
+            for (let i = gameObjects.length - 1; i >= 0; i--) {
+                let obj = gameObjects[i];
+                obj.x -= currentSpeed;
+
+                // Collision
+                if (dino.x < obj.x + obj.width - 15 && dino.x + dino.width - 15 > obj.x && dino.y < obj.y + obj.height - 15 && dino.y + dino.height - 15 > obj.y) {
+                    if (obj.type === 'obstacle') {
+                        isGameOver = true;
+                        if (score > highScore) { highScore = score; localStorage.setItem("ziggyHighScore", highScore); }
+                    } else if (!obj.counted) {
+                        score += 10; obj.counted = true;
+                        gameObjects.splice(i, 1);
+                        scoreElement.innerText = score;
+                    }
+                }
+
+                // Cleanup
+                if (obj.x + obj.width < -50) {
+                    gameObjects.splice(i, 1);
+                    if (obj.type === 'obstacle') { score++; scoreElement.innerText = score; }
+                }
+            }
+
+            gameFrame++;
+            if (gameFrame % Math.floor(currentSpawnGap) === 0) spawnGameObject();
         }
-    }
 
-    gameFrame++;
-    if (gameFrame % Math.floor(currentSpawnGap) === 0) {
-        spawnGameObject();
-    }
-}
+        function draw() {
+            const scene = getCurrentScene();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-// Slightly smaller hitbox for the obstacles to keep it fair at high speeds
-function spawnGameObject() {
-    const size = 42; 
-    const isObstacle = Math.random() > 0.35; // Slightly more obstacles than hearts
-    let yPos = canvas.height - size - 40;
-    if (!isObstacle) yPos -= 90; // Hearts float a bit higher
-    gameObjects.push({ x: canvas.width, y: yPos, width: size, height: size, type: isObstacle ? 'obstacle' : 'collectible', counted: false });
-}
+            if (scene.img.complete) {
+                ctx.drawImage(scene.img, 0, 0, canvas.width, 360); 
+            }
+
+            ctx.fillStyle = scene.ground;
+            ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
+
+            ctx.drawImage(playerImg, dino.x, dino.y, dino.width, dino.height);
+            gameObjects.forEach(obj => {
+                ctx.drawImage(obj.type === 'obstacle' ? obstacleImg : collectibleImg, obj.x, obj.y, obj.width, obj.height);
+            });
+
+            locationTag.innerText = scene.name;
+            ctx.fillStyle = (scene.name === "📍 NYC Night") ? "white" : "#ff4d4d";
+            ctx.font = "bold 18px sans-serif";
+            ctx.textAlign = "right";
+            ctx.fillText("Best: " + highScore, canvas.width - 20, 35);
+
+            if (isGameOver) {
+                ctx.fillStyle = "rgba(0,0,0,0.85)";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "white";
+                ctx.textAlign = "center";
+                ctx.font = "bold 36px sans-serif";
+                ctx.fillText(scene.msg, canvas.width/2, 160);
+                ctx.font = "20px sans-serif";
+                ctx.fillText("Final Score: " + score, canvas.width/2, 210);
+                ctx.fillText("Tap to try again!", canvas.width/2, 260);
+            }
+
+            update();
+            requestAnimationFrame(draw);
+        }
+
+        function restart() {
+            score = 0; scoreElement.innerText = 0; gameObjects = [];
+            isGameOver = false; dino.y = 200; dino.dy = 0; dino.jumps = 0;
+        }
+
+        draw();
+    </script>
+</body>
+</html>
